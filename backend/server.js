@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const authRouter = require('./Routes/AuthRouter');
+const issueRouter = require('./Routes/IssueRouter');
 const app = express();
 require('./Models/db'); // Ensure the database connection is established
 
@@ -16,7 +17,9 @@ app.use(bodyParser.urlencoded({ extended: true }));
 const port = process.env.PORT || 3000;
 
 
+
 app.use('/auth', authRouter);
+app.use('/issues', issueRouter);
 
 
 
