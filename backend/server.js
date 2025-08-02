@@ -9,7 +9,7 @@ require('./Models/db'); // Ensure the database connection is established
 const cors = require('cors');
 
 app.use(cors({
-  origin: 'http://localhost:5174',
+  origin: 'http://localhost:5173',
   credentials: true
 }));
 app.use(bodyParser.json());
@@ -26,6 +26,7 @@ app.use('/issues', issueRouter);
 app.get('/', (req, res) => {
   res.send('Welcome to the Civic Track API!');
 });
+
 app.listen(port, () => {
-  console.log(⁠ Server is running on port ${port} ⁠);
+  console.log(`Server is running on port ${port}`);
 });
