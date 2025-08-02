@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { GoogleMap, LoadScript } from "@react-google-maps/api";
 import { Marker } from "@react-google-maps/api";
 const containerStyle = {
-  width: "82vw",
-  height: "82vh",
+  width: "100vw",
+  height: "100vh",
 };
 
 // Default to New Delhi if user doesn't allow location
