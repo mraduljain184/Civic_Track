@@ -1,49 +1,99 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose")
+const Schema = mongoose.Schema
 
-const IssueSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  description: { type: String, required: true },
-  photos: [{ type: String }], // URLs or file paths
+const IssueSchema = new Schema({
+  title: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  description: {
+    type: String,
+    required: true,
+  },
   category: {
     type: String,
-    enum: [
-      'Roads',
-      'Lighting',
-      'Water Supply',
-      'Cleanliness',
-      'Public Safety',
-      'Obstructions',
-    ],
     required: true,
+    enum: ["Roads", "Lighting", "Water Supply", "Cleanliness", "Public Safety", "Obstructions"],
   },
   status: {
     type: String,
-    enum: ['Reported', 'In Progress', 'Resolved'],
-    default: 'Reported',
+    default: "Reported",
+    enum: ["Reported", "In Progress", "Resolved"],
   },
   location: {
-    type: { type: String, enum: ['Point'], required: true, default: 'Point' },
-    coordinates: { type: [Number], required: true }, // [lng, lat]
+    address: {
+      type: String,
+      required: true,
+    },
+    coordinates: {
+      latitude: {
+        type: Number,
+        required: true,
+      },
+      longitude: {
+        type: Number,
+        required: true,
+      },
+    },
   },
-  reporter: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
-  isAnonymous: { type: Boolean, default: false },
-  statusLogs: [
+  photos: [
     {
-      status: String,
-      timestamp: { type: Date, default: Date.now },
-      updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      type: String, // URLs to uploaded photos
+    },
+  ],
+  reportedBy: {
+    type: Schema.Types.ObjectId,
+    ref: "User",
+    default: null, // null for anonymous reports
+  },
+  isAnonymous: {
+    type: Boolean,
+    default: false,
+  },
+  activity: [
+    {
+      action: String,
+      timestamp: {
+        type: Date,
+        default: Date.now,
+      },
+      description: String,
+      updatedBy: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
     },
   ],
   flags: [
     {
-      flaggedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      flaggedBy: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
       reason: String,
-      timestamp: { type: Date, default: Date.now },
+      timestamp: {
+        type: Date,
+        default: Date.now,
+      },
     },
   ],
-  createdAt: { type: Date, default: Date.now },
-});
+  isHidden: {
+    type: Boolean,
+    default: false,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
+})
 
-IssueSchema.index({ location: '2dsphere' });
+// Add index for location-based queries
+IssueSchema.index({ "location.coordinates": "2dsphere" })
 
-module.exports = mongoose.model('Issue', IssueSchema);
+const IssueModel = mongoose.model("Issue", IssueSchema)
+module.exports = IssueModel

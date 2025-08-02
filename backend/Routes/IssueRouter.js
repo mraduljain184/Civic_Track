@@ -1,21 +1,23 @@
-const express = require('express');
-const router = express.Router();
-const IssueController = require('../Controllers/IssueController');
-// const { authenticate } = require('../Middlewares/Auth'); // Uncomment when auth is ready
+const {
+  getIssuesNearby,
+  createIssue,
+  getIssueById,
+  updateIssueStatus,
+  flagIssue,
+  getFilteredIssues,
+} = require("../Controllers/IssueController");
+const ensureAuthenticated = require("../Middlewares/Auth");
 
-// Create a new issue
-router.post('/', /*authenticate,*/ IssueController.createIssue);
+const router = require("express").Router();
 
-// Get issues with filters
-router.get('/', IssueController.getIssues);
+// Public routes
+router.get("/nearby", getIssuesNearby);
+router.get("/filtered", getFilteredIssues);
+router.get("/:id", getIssueById);
 
-// Get issue details
-router.get('/:id', IssueController.getIssueById);
-
-// Update issue status
-router.patch('/:id/status', /*authenticate,*/ IssueController.updateIssueStatus);
-
-// Flag an issue
-router.post('/:id/flag', /*authenticate,*/ IssueController.flagIssue);
+// Protected routes
+router.post("/create", ensureAuthenticated, createIssue);
+router.put("/:id/status", ensureAuthenticated, updateIssueStatus);
+router.post("/:id/flag", ensureAuthenticated, flagIssue);
 
 module.exports = router;

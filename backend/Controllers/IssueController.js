@@ -1,83 +1,240 @@
-const Issue = require('../Models/Issue');
+const IssueModel = require("../Models/Issue");
+const UserModel = require("../Models/User");
 
-// Create a new issue
-exports.createIssue = async (req, res) => {
+// Get issues within radius
+const getIssuesNearby = async (req, res) => {
   try {
-    const { title, description, photos, category, location, isAnonymous } = req.body;
-    const reporter = isAnonymous ? null : req.user?._id;
-    const issue = new Issue({
+    const { latitude, longitude, radius = 5 } = req.query;
+
+    if (!latitude || !longitude) {
+      return res
+        .status(400)
+        .json({ message: "Latitude and longitude are required" });
+    }
+
+    const radiusInMeters = radius * 1000; // Convert km to meters
+
+    const issues = await IssueModel.find({
+      isHidden: false,
+      "location.coordinates": {
+        $near: {
+          $geometry: {
+            type: "Point",
+            coordinates: [
+              Number.parseFloat(longitude),
+              Number.parseFloat(latitude),
+            ],
+          },
+          $maxDistance: radiusInMeters,
+        },
+      },
+    })
+      .populate("reportedBy", "username")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ issues });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error fetching issues", error: error.message });
+  }
+};
+
+// Create new issue
+const createIssue = async (req, res) => {
+  try {
+    const { title, description, category, location, photos, isAnonymous } =
+      req.body;
+    const userId = req.user ? req.user.id : null;
+
+    const newIssue = new IssueModel({
       title,
       description,
-      photos,
       category,
       location,
-      reporter,
+      photos: photos[0] || [],
+      reportedBy: isAnonymous ? null : userId,
       isAnonymous,
-      statusLogs: [{ status: 'Reported', updatedBy: reporter }],
-    });
-    await issue.save();
-    res.status(201).json(issue);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-};
-
-// Get issues with optional filters (status, category, distance)
-exports.getIssues = async (req, res) => {
-  try {
-    const { status, category, lng, lat, radius } = req.query;
-    let filter = {};
-    if (status) filter.status = status;
-    if (category) filter.category = category;
-    if (lng && lat && radius) {
-      filter.location = {
-        $geoWithin: {
-          $centerSphere: [[parseFloat(lng), parseFloat(lat)], parseFloat(radius) / 6378.1],
+      activity: [
+        {
+          action: "Reported",
+          description: "Issue reported by user",
+          updatedBy: userId,
         },
-      };
-    }
-    const issues = await Issue.find(filter);
-    res.json(issues);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+      ],
+    });
+
+    await newIssue.save();
+    res
+      .status(201)
+      .json({ message: "Issue reported successfully", issue: newIssue });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error creating issue", error: error.message });
   }
 };
 
-// Get issue details
-exports.getIssueById = async (req, res) => {
+// Get issue by ID
+const getIssueById = async (req, res) => {
   try {
-    const issue = await Issue.findById(req.params.id);
-    if (!issue) return res.status(404).json({ message: 'Issue not found' });
-    res.json(issue);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    const { id } = req.params;
+    const issue = await IssueModel.findById(id)
+      .populate("reportedBy", "username")
+      .populate("activity.updatedBy", "username");
+
+    if (!issue) {
+      return res.status(404).json({ message: "Issue not found" });
+    }
+
+    res.status(200).json({ issue });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error fetching issue", error: error.message });
   }
 };
 
 // Update issue status
-exports.updateIssueStatus = async (req, res) => {
+const updateIssueStatus = async (req, res) => {
   try {
-    const { status } = req.body;
-    const issue = await Issue.findById(req.params.id);
-    if (!issue) return res.status(404).json({ message: 'Issue not found' });
+    const { id } = req.params;
+    const { status, description } = req.body;
+    const userId = req.user.id;
+
+    const issue = await IssueModel.findById(id);
+    if (!issue) {
+      return res.status(404).json({ message: "Issue not found" });
+    }
+
     issue.status = status;
-    issue.statusLogs.push({ status, updatedBy: req.user?._id });
+    issue.updatedAt = new Date();
+    issue.activity.push({
+      action: `Status changed to ${status}`,
+      description: description || `Issue status updated to ${status}`,
+      updatedBy: userId,
+    });
+
     await issue.save();
-    res.json(issue);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
+    res
+      .status(200)
+      .json({ message: "Issue status updated successfully", issue });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error updating issue status", error: error.message });
   }
 };
 
-// Flag an issue
-exports.flagIssue = async (req, res) => {
+// Flag issue
+const flagIssue = async (req, res) => {
   try {
-    const issue = await Issue.findById(req.params.id);
-    if (!issue) return res.status(404).json({ message: 'Issue not found' });
-    issue.flags.push({ flaggedBy: req.user?._id, reason: req.body.reason });
+    const { id } = req.params;
+    const { reason } = req.body;
+    const userId = req.user.id;
+
+    const issue = await IssueModel.findById(id);
+    if (!issue) {
+      return res.status(404).json({ message: "Issue not found" });
+    }
+
+    // Check if user already flagged this issue
+    const alreadyFlagged = issue.flags.some(
+      (flag) => flag.flaggedBy.toString() === userId
+    );
+    if (alreadyFlagged) {
+      return res
+        .status(400)
+        .json({ message: "You have already flagged this issue" });
+    }
+
+    issue.flags.push({
+      flaggedBy: userId,
+      reason,
+    });
+
+    // Auto-hide if flagged by 3 or more users
+    if (issue.flags.length >= 3) {
+      issue.isHidden = true;
+    }
+
     await issue.save();
-    res.json({ message: 'Issue flagged' });
-  } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(200).json({ message: "Issue flagged successfully" });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error flagging issue", error: error.message });
   }
+};
+
+// Get filtered issues
+const getFilteredIssues = async (req, res) => {
+  try {
+    const {
+      latitude,
+      longitude,
+      radius = 5,
+      status,
+      category,
+      search,
+    } = req.query;
+
+    if (!latitude || !longitude) {
+      return res
+        .status(400)
+        .json({ message: "Latitude and longitude are required" });
+    }
+
+    const radiusInMeters = radius * 1000;
+    const query = {
+      isHidden: false,
+      "location.coordinates": {
+        $near: {
+          $geometry: {
+            type: "Point",
+            coordinates: [
+              Number.parseFloat(longitude),
+              Number.parseFloat(latitude),
+            ],
+          },
+          $maxDistance: radiusInMeters,
+        },
+      },
+    };
+
+    if (status && status !== "All") {
+      query.status = status;
+    }
+
+    if (category && category !== "All") {
+      query.category = category;
+    }
+
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const issues = await IssueModel.find(query)
+      .populate("reportedBy", "username")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ issues });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching filtered issues",
+      error: error.message,
+    });
+  }
+};
+
+module.exports = {
+  getIssuesNearby,
+  createIssue,
+  getIssueById,
+  updateIssueStatus,
+  flagIssue,
+  getFilteredIssues,
 };
