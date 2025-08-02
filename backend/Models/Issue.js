@@ -1,5 +1,5 @@
-const mongoose = require("mongoose")
-const Schema = mongoose.Schema
+const mongoose = require("mongoose");
+const Schema = mongoose.Schema;
 
 const IssueSchema = new Schema({
   title: {
@@ -14,7 +14,14 @@ const IssueSchema = new Schema({
   category: {
     type: String,
     required: true,
-    enum: ["Roads", "Lighting", "Water Supply", "Cleanliness", "Public Safety", "Obstructions"],
+    enum: [
+      "Roads",
+      "Lighting",
+      "Water Supply",
+      "Cleanliness",
+      "Public Safety",
+      "Obstructions",
+    ],
   },
   status: {
     type: String,
@@ -22,21 +29,22 @@ const IssueSchema = new Schema({
     enum: ["Reported", "In Progress", "Resolved"],
   },
   location: {
+    type: {
+      type: String,
+      enum: ["Point"],
+      required: true,
+      default: "Point",
+    },
+    coordinates: {
+      type: [Number], // [longitude, latitude]
+      required: true,
+    },
     address: {
       type: String,
       required: true,
     },
-    coordinates: {
-      latitude: {
-        type: Number,
-        required: true,
-      },
-      longitude: {
-        type: Number,
-        required: true,
-      },
-    },
   },
+
   photos: [
     {
       type: String, // URLs to uploaded photos
@@ -90,10 +98,10 @@ const IssueSchema = new Schema({
     type: Date,
     default: Date.now,
   },
-})
+});
 
 // Add index for location-based queries
-IssueSchema.index({ "location.coordinates": "2dsphere" })
+IssueSchema.index({ "location.coordinates": "2dsphere" });
 
-const IssueModel = mongoose.model("Issue", IssueSchema)
-module.exports = IssueModel
+const IssueModel = mongoose.model("Issue", IssueSchema);
+module.exports = IssueModel;

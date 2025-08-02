@@ -13,7 +13,10 @@ export const useLocation = () => {
 };
 
 export const LocationProvider = ({ children }) => {
-  const [location, setLocation] = useState(null);
+  const [location, setLocation] = useState(() => {
+    const storedLocation = localStorage.getItem("userLocation");
+    return storedLocation ? JSON.parse(storedLocation) : null;
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -33,20 +36,25 @@ export const LocationProvider = ({ children }) => {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLocation({
+        const newLocation = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-        });
+        };
+        setLocation(newLocation);
+        // Store in localStorage for other components to use
+        localStorage.setItem("userLocation", JSON.stringify(newLocation));
         setLoading(false);
       },
       (error) => {
         setError("Unable to retrieve your location");
         setLoading(false);
         // Set default location (you can change this)
-        setLocation({
+        const defaultLocation = {
           latitude: 23.0225, // Ahmedabad coordinates as fallback
           longitude: 72.5714,
-        });
+        };
+        setLocation(defaultLocation);
+        localStorage.setItem("userLocation", JSON.stringify(defaultLocation));
       },
       {
         enableHighAccuracy: true,
@@ -58,6 +66,7 @@ export const LocationProvider = ({ children }) => {
 
   const updateLocation = (newLocation) => {
     setLocation(newLocation);
+    localStorage.setItem("userLocation", JSON.stringify(newLocation));
   };
 
   return (
